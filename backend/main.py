@@ -2,13 +2,13 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import os
 import psycopg2
 import jwt
 import re
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from cryptography.fernet import Fernet
-import joblib
 import pandas as pd
 import numpy as np
 
@@ -28,7 +28,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 FERNET_KEY = b'cw_0x689ShIwe9tqxgJZCQcvpzNwZdYjWZeUSh2HjB8='
 cipher_suite = Fernet(FERNET_KEY)
 
-DATABASE_URL = "postgresql://neondb_owner:npg_9qVPz6ZnYMNQ@ep-wandering-rice-za12azx0-pooler.c-2.eu-west-2.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 def get_db_connection():
     try:
@@ -40,12 +40,25 @@ def get_db_connection():
 
 ai_model = None
 model_features = None
-try:
-    ai_model = joblib.load('medassist_disease_model.pkl')
-    model_features = joblib.load('model_features.pkl')
-    print("AI Model & Features loaded successfully!")
-except Exception as e:
-    print("Model Load Warning:", e)
+_models_loaded = False
+
+def load_ai_models():
+    """Lazily load the ML models on first use to avoid startup memory
+    pressure and segfaults caused by loading TensorFlow-backed models
+    at module import time."""
+    global ai_model, model_features, _models_loaded
+    if _models_loaded:
+        return ai_model, model_features
+    import joblib
+    try:
+        ai_model = joblib.load('medassist_disease_model.pkl')
+        model_features = joblib.load('model_features.pkl')
+        print("AI Model & Features loaded successfully!")
+    except Exception as e:
+        print("Model Load Warning:", e)
+    finally:
+        _models_loaded = True
+    return ai_model, model_features
 
 class UserRegister(BaseModel):
     email: str
@@ -144,8 +157,15 @@ def login_user(user: UserLogin):
     access_token = jwt.encode(token_payload, SECRET_KEY, algorithm=ALGORITHM)
     return {"access_token": access_token, "role": user.role}
 
+@app.get("/health")
+def health_check():
+    load_ai_models()
+    return {"status": "ok"}
+
 @app.post("/api/predict")
 def predict_disease(data: SymptomRequest, token_data: dict = Depends(verify_jwt_token)):
+    current_model, current_features = load_ai_models()
+
     symptoms_str = f"Text: {data.symptoms_text} | Fever: {data.fever}, Cough: {data.cough}, Fatigue: {data.fatigue}, Breathing: {data.difficulty_breathing}, BP: {data.blood_pressure}, Chol: {data.cholesterol}"
     encrypted_symptoms = cipher_suite.encrypt(symptoms_str.encode()).decode()
     
@@ -154,7 +174,7 @@ def predict_disease(data: SymptomRequest, token_data: dict = Depends(verify_jwt_
     confidence_score = 92.5
     risk = "Low"
 
-    if ai_model and model_features:
+    if current_model and current_features:
         try:
             input_dict = {
                 'Fever': [data.fever],
@@ -166,10 +186,10 @@ def predict_disease(data: SymptomRequest, token_data: dict = Depends(verify_jwt_
             }
             df_input = pd.DataFrame(input_dict)
             df_encoded = pd.get_dummies(df_input)
-            df_encoded = df_encoded.reindex(columns=model_features, fill_value=0)
+            df_encoded = df_encoded.reindex(columns=current_features, fill_value=0)
             
-            raw_pred = ai_model.predict(df_encoded)[0]
-            probs = ai_model.predict_proba(df_encoded)
+            raw_pred = current_model.predict(df_encoded)[0]
+            probs = current_model.predict_proba(df_encoded)
             confidence_score = float(np.max(probs) * 100)
             if confidence_score < 50.0:
                 confidence_score = 91.5
