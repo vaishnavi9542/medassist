@@ -62,10 +62,15 @@ def get_database_url() -> str:
     return str(url)
 
 
+# Only set search_path for local development, not for Neon (pooler doesn't support it)
+connect_args = {}
+if not os.getenv("DATABASE_URL"):
+    connect_args = {"options": "-c search_path=medassist"}
+
 engine = create_engine(
     get_database_url(),
     pool_pre_ping=True,
-    connect_args={"options": "-c search_path=medassist"},
+    connect_args=connect_args,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -87,3 +92,4 @@ def test_connection() -> bool:
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
     return True
+
