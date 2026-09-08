@@ -104,3 +104,4 @@ def test_connection() -> bool:
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
     return True
+
