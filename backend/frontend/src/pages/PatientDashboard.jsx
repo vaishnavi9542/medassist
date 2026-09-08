@@ -11,6 +11,7 @@ import Reports from './patient/Reports'
 import Analytics from './patient/Analytics'
 import Recommendations from './patient/Recommendations'
 import Settings from './patient/Settings'
+import Chat from './Chat'
 import { fetchPatientDashboard } from '../api/dashboard'
 
 const menu = [
@@ -23,6 +24,7 @@ const menu = [
   {to:'/dashboard/patient/reports', label:'Reports'},
   {to:'/dashboard/patient/analytics', label:'Analytics'},
   {to:'/dashboard/patient/recommendations', label:'Recommendations'},
+  {to:'/dashboard/patient/chat', label:'Chat'},
   {to:'/dashboard/patient/settings', label:'Settings'},
 ]
 
@@ -86,6 +88,7 @@ export default function PatientDashboard(){
         <Route path="reports" element={<Reports dashboardData={dashboardData} reloadDashboard={reloadDashboard} />} />
         <Route path="analytics" element={<Analytics dashboardData={dashboardData} reloadDashboard={reloadDashboard} />} />
         <Route path="recommendations" element={<Recommendations dashboardData={dashboardData} reloadDashboard={reloadDashboard} />} />
+        <Route path="chat" element={<Chat />} />
         <Route path="settings" element={<Settings dashboardData={dashboardData} reloadDashboard={reloadDashboard} />} />
         <Route path="*" element={<Navigate to="/dashboard/patient" replace />} />
       </Routes>

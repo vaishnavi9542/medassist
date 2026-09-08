@@ -80,6 +80,17 @@ class Notification(Base):
     read_at = Column(DateTime)
 
 
+class ChatMessage(Base):
+    __tablename__ = 'chat_messages'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sender_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    recipient_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    read_at = Column(DateTime)
+
+
 class MedicalHistory(Base):
     __tablename__ = 'medical_history'
 

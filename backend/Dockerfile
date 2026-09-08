@@ -9,8 +9,7 @@ WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --create-home app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    PyJWT==2.10.1 cryptography==44.0.2 psycopg2-binary==2.9.10
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY db ./db

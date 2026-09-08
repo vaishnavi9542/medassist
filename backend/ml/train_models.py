@@ -541,6 +541,8 @@ def main() -> None:
     
     best_model = trained_models[best_model_name]
     save_best_model(best_model, best_model_name, output_dir)
+    if "Random Forest" in trained_models:
+        joblib.dump(trained_models["Random Forest"], output_dir / "best_model.pkl")
     
     logger.info("="*70)
     logger.info("TRAINING PIPELINE COMPLETED SUCCESSFULLY")

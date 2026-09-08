@@ -51,6 +51,18 @@ def run_schema() -> None:
         ))
         conn.execute(text(
             """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id SERIAL PRIMARY KEY,
+                sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                body TEXT NOT NULL,
+                created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                read_at TIMESTAMP WITHOUT TIME ZONE
+            );
+            """
+        ))
+        conn.execute(text(
+            """
             ALTER TABLE notifications
             ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITHOUT TIME ZONE;
             """

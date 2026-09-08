@@ -18,8 +18,8 @@ if (Test-Path $venvPython) {
     exit 1
 }
 
-Write-Host 'Starting backend server on http://127.0.0.1:8000 ...'
-Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoExit', '-Command', "Set-Location -LiteralPath '$backendPath'; & '$pythonPath' -m uvicorn app.main:app --reload --port 8000"
+Write-Host 'Starting backend server on http://127.0.0.1:8001 ...'
+Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoExit', '-Command', "Set-Location -LiteralPath '$backendPath'; & '$pythonPath' -m db.init_db; if (`$LASTEXITCODE -ne 0) { exit `$LASTEXITCODE }; & '$pythonPath' -m uvicorn app.main:app --reload --port 8001"
 
 Write-Host 'Starting frontend server on http://127.0.0.1:5173 ...'
 Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoExit', '-Command', "Set-Location -LiteralPath '$frontendPath'; npm install; npm run dev"

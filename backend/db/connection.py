@@ -41,11 +41,28 @@ def _normalize_database_url(raw_url: str) -> str:
 
 
 def get_database_url() -> str:
+    host = os.getenv("POSTGRES_HOST")
+    if host:
+        port = _env("POSTGRES_PORT", "5432")
+        db = _env("POSTGRES_DB", "medassist")
+        user = _env("POSTGRES_USER", "postgres")
+        password = _env("POSTGRES_PASSWORD", "root@123")
+
+        return URL.create(
+            drivername="postgresql+psycopg",
+            username=user,
+            password=password,
+            host=host,
+            port=int(port),
+            database=db,
+            query={"options": "-csearch_path=medassist"},
+        )
+
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         return _normalize_database_url(database_url)
 
-    host = _env("POSTGRES_HOST", "localhost")
+    host = "localhost"
     port = _env("POSTGRES_PORT", "5432")
     db = _env("POSTGRES_DB", "medassist")
     user = _env("POSTGRES_USER", "postgres")
@@ -65,6 +82,7 @@ def get_database_url() -> str:
 engine = create_engine(
     get_database_url(),
     pool_pre_ping=True,
+    connect_args={"options": "-csearch_path=medassist"},
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

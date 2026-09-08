@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import os
 import traceback
 from collections import Counter
 from datetime import datetime
@@ -43,7 +44,7 @@ from app.models import User
 from app.recommendation_engine import generate_recommendations_for_prediction
 from app.models import EmailConfirmation
 from app.models import ApiToken, PatientProfile, ProviderProfile, MedicalHistory, PatientSymptom, DiseasePrediction, RiskAssessment, Recommendation, Report, Symptom
-from app.models import ApiToken, Notification, PatientProfile, ProviderProfile, MedicalHistory, PatientSymptom, DiseasePrediction, RiskAssessment, Recommendation, Report, Symptom
+from app.models import ApiToken, ChatMessage, Notification, PatientProfile, ProviderProfile, MedicalHistory, PatientSymptom, DiseasePrediction, RiskAssessment, Recommendation, Report, Symptom
 from db.connection import get_db_session
 from db.init_db import run_schema
 
@@ -53,11 +54,15 @@ app = FastAPI(title="MedAssist API")
 # def initialize_database():
 #     run_schema()
 
-# Enable CORS for local frontend development (development-only).
-# Use explicit local frontend origins when allow_credentials=True.
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv('CORS_ORIGINS', os.getenv('FRONTEND_URL', '')).split(',')
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
+    allow_origins=configured_origins + [
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "http://127.0.0.1:5175",
@@ -750,6 +755,91 @@ def login(payload: dict, session=Depends(get_session)):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _chat_contact(user: User) -> dict:
+    return {'id': user.id, 'full_name': user.full_name, 'email': user.email, 'role': user.role}
+
+
+@app.get('/chat/contacts')
+def chat_contacts(authorization: str = Header(None), session=Depends(get_session)):
+    user = get_authenticated_user(
+        authorization.split(' ', 1)[1] if authorization and authorization.startswith('Bearer ') else None,
+        session,
+    )
+    target_role = 'doctor' if user.role == 'patient' else 'patient'
+    contacts = session.execute(
+        select(User).where(User.role == target_role).order_by(User.full_name)
+    ).scalars().all()
+    return {'contacts': [_chat_contact(contact) for contact in contacts]}
+
+
+@app.get('/chat/messages/{other_user_id}')
+def chat_messages(other_user_id: int, authorization: str = Header(None), session=Depends(get_session)):
+    user = get_authenticated_user(
+        authorization.split(' ', 1)[1] if authorization and authorization.startswith('Bearer ') else None,
+        session,
+    )
+    other_user = session.get(User, other_user_id)
+    if not other_user or other_user.id == user.id or {user.role, other_user.role} != {'patient', 'doctor'}:
+        raise HTTPException(status_code=404, detail='Chat contact not found')
+
+    messages = session.execute(
+        select(ChatMessage)
+        .where(
+            ((ChatMessage.sender_id == user.id) & (ChatMessage.recipient_id == other_user.id))
+            | ((ChatMessage.sender_id == other_user.id) & (ChatMessage.recipient_id == user.id))
+        )
+        .order_by(ChatMessage.created_at, ChatMessage.id)
+    ).scalars().all()
+    for message in messages:
+        if message.recipient_id == user.id and message.read_at is None:
+            message.read_at = datetime.utcnow()
+    session.commit()
+    return {
+        'contact': _chat_contact(other_user),
+        'messages': [
+            {
+                'id': message.id,
+                'sender_id': message.sender_id,
+                'recipient_id': message.recipient_id,
+                'body': message.body,
+                'created_at': message.created_at.isoformat() if message.created_at else None,
+                'read_at': message.read_at.isoformat() if message.read_at else None,
+            }
+            for message in messages
+        ],
+    }
+
+
+@app.post('/chat/messages')
+def send_chat_message(payload: dict, authorization: str = Header(None), session=Depends(get_session)):
+    user = get_authenticated_user(
+        authorization.split(' ', 1)[1] if authorization and authorization.startswith('Bearer ') else None,
+        session,
+    )
+    try:
+        recipient_id = int(payload.get('recipient_id'))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail='recipient_id is required')
+    body = str(payload.get('body') or '').strip()
+    recipient = session.get(User, recipient_id)
+    if not body or len(body) > 4000:
+        raise HTTPException(status_code=400, detail='Message must contain 1 to 4000 characters')
+    if not recipient or recipient.id == user.id or {user.role, recipient.role} != {'patient', 'doctor'}:
+        raise HTTPException(status_code=404, detail='Chat contact not found')
+
+    message = ChatMessage(sender_id=user.id, recipient_id=recipient.id, body=body)
+    session.add(message)
+    session.commit()
+    session.refresh(message)
+    return {
+        'id': message.id,
+        'sender_id': message.sender_id,
+        'recipient_id': message.recipient_id,
+        'body': message.body,
+        'created_at': message.created_at.isoformat() if message.created_at else None,
+    }
 
 
 def get_authenticated_user(token: str, session):

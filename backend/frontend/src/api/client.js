@@ -1,4 +1,4 @@
-const fallbackApiBase = 'http://127.0.0.1:8000'
+const fallbackApiBase = 'http://127.0.0.1:8001'
 export const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || fallbackApiBase
 
 export function getToken() {

@@ -12,6 +12,7 @@ import Analytics from './provider/Analytics'
 import Recommendations from './provider/Recommendations'
 import Settings from './provider/Settings'
 import Profile from './provider/Profile'
+import Chat from './Chat'
 import { fetchProviderDashboard } from '../api/dashboard'
 
 const menu = [
@@ -24,6 +25,7 @@ const menu = [
   {to:'/dashboard/provider/reports', label:'Reports'},
   {to:'/dashboard/provider/analytics', label:'Analytics'},
   {to:'/dashboard/provider/recommendations', label:'Recommendations'},
+  {to:'/dashboard/provider/chat', label:'Chat'},
   {to:'/dashboard/provider/profile', label:'Profile'},
   {to:'/dashboard/provider/settings', label:'Settings'},
 ]
@@ -87,6 +89,7 @@ export default function ProviderDashboard(){
         <Route path="reports" element={<Reports dashboardData={dashboardData} />} />
         <Route path="analytics" element={<Analytics dashboardData={dashboardData} />} />
         <Route path="recommendations" element={<Recommendations dashboardData={dashboardData} />} />
+        <Route path="chat" element={<Chat />} />
         <Route path="profile" element={<Profile dashboardData={dashboardData} />} />
         <Route path="settings" element={<Settings dashboardData={dashboardData} />} />
         <Route path="*" element={<Navigate to="/dashboard/provider" replace />} />
